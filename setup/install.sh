@@ -58,6 +58,7 @@ function installHotspot {
     rm -f /etc/modprobe.d/blacklist-rtl8192cu.conf
 
     logProcess "Setting up hotspot configuration ..."
+    mkdir "/boot/settings" 2> /dev/null
     createHotspotConfig "/boot/settings/hotspot.conf" "$hotspot_name" "$hotspot_psk"
 
     logProcess "Configuring hostapd service ..."
