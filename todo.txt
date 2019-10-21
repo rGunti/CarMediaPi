@@ -1,0 +1,12 @@
+setup/install.sh:
+    - Run pi-hole installation first
+    * Automate pi-hole installation
+    - Add wpa_supplicant
+    - Add samba install / config
+
+README.md:
+    - Create install documentation
+
+GENERAL:
+    - Create auto-installer without interactivity
+    - Parameters provided through text file on /boot partition
