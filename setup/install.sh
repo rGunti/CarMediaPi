@@ -144,7 +144,16 @@ EOF
 
 function installPiHole {
     logProcess "Installing Pi-Hole ..."
-    logInfo "The installation is interactive, please be ready to answer more questions"
+    logInfo "The installation is interactive, please be ready to answer more questions!"
+    logInfo "If the Pi-Hole installer asks you for a static IP address, enter the following values:"
+    logBlank " - Interface:  wlan0"
+    logBlank " - IP address: 10.0.0.1/24"
+    logBlank " - Gateway:    10.0.0.1"
+
+    _msg=$(logBlank "Press any key to continue ...")
+    read -n1 -p "${_msg}"
+    _msg=$(logProcess "Downloading and installing Pi-Hole ...")
+    echo -e "\r${_msg}"
 
     curl -sSL https://install.pi-hole.net | bash
 
@@ -232,8 +241,8 @@ function main {
         response_pihole=$(($?==0))
     fi
 
-    confirm "Install Samba (SMB File Share)? (default: yes)"
-    response_samba=$(($?==0))
+    #confirm "Install Samba (SMB File Share)? (default: yes)"
+    #response_samba=$(($?==0))
 
     # Log changes to be applied and ask user for confirmation
     logInfo "The following changes will be applied:"
@@ -250,9 +259,9 @@ function main {
     else
         logBlank "- Install package \"dnsmasq\""
     fi
-    if [[ $response_samba -eq 1 ]]; then
-        logBlank "- Install package \"samba\" and \"samba-common-bin\""
-    fi
+    #if [[ $response_samba -eq 1 ]]; then
+    #    logBlank "- Install package \"samba\" and \"samba-common-bin\""
+    #fi
 
     confirm "Do you want to proceed with the installation?"
     if [[ $? -eq 1 ]]; then
@@ -260,6 +269,7 @@ function main {
         exit 1
     fi
 
+    # Run Installation routines
     logInfo "OK, let's go!"
     if [[ $response_hotspot -eq 1 ]]; then
         installHotspot "${response_hotspot_name}" "${response_hotspot_psk}"
@@ -270,7 +280,7 @@ function main {
     else
         installDnsMasq
     fi
-    if [[ $response_samba -eq 1 ]]; then installSamba; fi
+    #if [[ $response_samba -eq 1 ]]; then installSamba; fi
 
     logInfo "Installation completed!"
     logWarn "A reboot is required to finish the installation!"
