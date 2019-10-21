@@ -127,8 +127,16 @@ function installPiHole {
 
     curl -sSL https://install.pi-hole.net | bash
 
+    if [[ $? -ne 0 ]]; then
+        logFatal "Installation of Pi-Hole apperantly failed! Aborting ${CARMEDIAPI} installation as well ..."
+        exit 100
+    fi
+
     logInfo "Pi-Hole installation completed! Continuing with more configuration ..."
     configureDhcpServer
+
+    logProcess "Patching permission issue with dnsmasq lease file ..."
+    chown -R pihole:pihole /var/lib/misc/
 }
 
 function installDnsMasq {
