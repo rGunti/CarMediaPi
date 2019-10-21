@@ -6,11 +6,11 @@ SCRIPT_LOCATION="$(cd "$(dirname ${BASH_SOURCE[0]})"; pwd -P)"
 P_SKIP_ROOT=0
 
 # Include dependencies
-source "${SCRIPT_LOCATION}/commons/screen.sh"
+#source "${SCRIPT_LOCATION}/commons/screen.sh"
 source "${SCRIPT_LOCATION}/commons/logging.sh"
 source "${SCRIPT_LOCATION}/commons/input.sh"
 
-logInternal "Screen size is ${SCREEN_ROWS}x${SCREEN_COLS} (${SCREEN_SIZE})"
+#logInternal "Screen size is ${SCREEN_ROWS}x${SCREEN_COLS} (${SCREEN_SIZE})"
 
 CARMEDIAPI="${COLOR_BLUE}CAR${COLOR_DGRAY}(${COLOR_GREEN}MEDIA${COLOR_DGRAY})${COLOR_RED}PI${COLOR_NONE}"
 
@@ -47,6 +47,27 @@ EOF
     ln -s "$path" /etc/hostapd/hostapd.conf
 }
 
+function configureDhcpcd {
+    cat <<EOF > "/etc/dhcpcd.conf"
+# ########################################### #
+# DHCPCD CONFIGURATION                        #
+# ########################################### #
+
+hostname
+clientid
+persistent
+option rapid_commit
+option domain_name_servers, domain_name, domain_search, host_name
+option classless_static_routes
+require dhcp_server_identifier
+slaac private
+
+interface wlan0
+        static ip_address=10.0.0.1/24
+        nohook wpa_supplicant
+EOF
+}
+
 function installHotspot {
     hotspot_name=$1
     hotspot_psk=$2
@@ -64,18 +85,68 @@ function installHotspot {
     logProcess "Configuring hostapd service ..."
     systemctl unmask hostapd
     systemctl enable hostapd
+
+    logProcess "Configuring local IP address ..."
+    configureDhcpcd
 }
 
 function installIpForward {
     logProcess "Setting up IP forwarding ..."
 }
 
+function configureDhcpServer {
+    logProcess "Configuring DHCP server ..."
+
+    cat <<EOF > "/etc/dnsmasq.d/010-wifi-hotspot.conf"
+# ########################################### #
+# DNSMASQ CONFIGURATION                       #
+# WiFi DHCP Configuration                     #
+# ########################################### #
+
+interface=wlan0
+dhcp-range=10.0.0.100,10.0.0.200,255.255.255.0,1h
+
+local=/pi/
+domain=pi
+EOF
+
+    cat <<EOF > "/etc/dnsmasq.d/011-domains.conf"
+# ########################################### #
+# DNSMASQ CONFIGURATION                       #
+# Domains Overwrite Configuration             #
+# ########################################### #
+
+address=/pi/10.0.0.1
+address=/pi.net/10.0.0.1
+EOF
+}
+
 function installPiHole {
     logProcess "Installing Pi-Hole ..."
+    logInfo "The installation is interactive, please be ready to answer more questions"
+
+    curl -sSL https://install.pi-hole.net | bash
+
+    logInfo "Pi-Hole installation completed! Continuing with more configuration ..."
+    configureDhcpServer
 }
 
 function installDnsMasq {
     logProcess "Installing Dnsmasq ..."
+    apt -y install dnsmasq
+
+    logProcess "Adding dnsmasq configuration ..."
+    mkdir "/etc/dnsmasq.d" 2> /dev/null
+    cat <<EOF > "/etc/dnsmasq.conf"
+# ########################################### #
+# DNSMASQ CONFIGURATION                       #
+# Default Configuration                       #
+# ########################################### #
+
+conf-dir=/etc/dnsmasq.d
+EOF
+
+    configureDhcpServer
 }
 
 function installSamba {
@@ -166,6 +237,15 @@ function main {
         installDnsMasq
     fi
     if [[ $response_samba -eq 1 ]]; then installSamba; fi
+
+    logInfo "Installation completed!"
+    logWarn "A reboot is required to finish the installation!"
+    confirm "Do you want to reboot now?"
+    if [[ $? -eq 0 ]]; then
+        logProcess "Alright, rebooting your system ..."
+        reboot
+        exit 0
+    fi
 }
 
 # ### Arguments ###
