@@ -189,6 +189,73 @@ EOF
 
 function installSamba {
     logProcess "Installing Samba ..."
+    apt -y install samba
+
+    logProcess "Backing up original Samba configuration ..."
+    mv /etc/samba/smb.conf /etc/samba/smb.conf.orig
+
+    logProcess "Configuring Samba ..."
+    cat <<EOF > /etc/samba/smb.conf
+[global]
+	workgroup = CARMEDIAPI
+	log file = /var/log/samba/log.%m
+	max log size = 1000
+	logging = file
+	panic action = /usr/share/samba/panic-action %d
+	server role = standalone server
+	obey pam restrictions = yes
+	unix password sync = yes
+	passwd program = /usr/bin/passwd %u
+	passwd chat = *Enter\snew\s*\spassword:* %n\n *Retype\snew\s*\spassword:* %n\n *password\supdated\ssuccessfully* .
+	pam password change = yes
+	map to guest = bad user
+	usershare allow guests = yes
+[homes]
+	comment = Home Directories
+	browseable = no
+	read only = yes
+	create mask = 0700
+	directory mask = 0700
+	valid users = %S
+[Media]
+	comment = Media Drive
+	path = /umedia
+	create mask = 0777
+	directory mask = 0777
+	read only = no
+	browsable = yes
+	public = yes
+	force user = pi
+	only guest = no
+EOF
+
+    logProcess "Creating file share location ..."
+    mkdir /umedia
+    chown -R pi:pi /umedia
+}
+
+function installExfat {
+    logProcess "Installing exFAT support ..."
+    apt -y install exfat-fuse exfat-utils
+}
+
+function configureFstab {
+    fileSystem=${1}
+
+    logProcess "Configuring auto-mount ..."
+    cat <<EOF | tee -a /etc/fstab
+# ### CAR(MEDIA)PI ### #
+/dev/disk/by-label/CARMEDIAPI	/umedia	${fileSystem}	defaults,nofail,auto,users,rw,umask=000,uid=1000,gid=1000	0	0
+# #################### #
+EOF
+}
+
+function updatePackageSources {
+    logProcess "Updating package sources ..."
+    apt update
+
+    logProcess "Updating local packages ..."
+    apt upgrade -y
 }
 
 function main {
@@ -241,8 +308,13 @@ function main {
         response_pihole=$(($?==0))
     fi
 
-    #confirm "Install Samba (SMB File Share)? (default: yes)"
-    #response_samba=$(($?==0))
+    confirm "Install Samba (SMB File Share)? (default: yes)"
+    response_samba=$(($?==0))
+    response_exfat=0
+    if [[ $response_samba -eq 1 ]]; then
+        confirm "Install exFAT support?"
+        response_exfat=$(($?==0))
+    fi
 
     # Log changes to be applied and ask user for confirmation
     logInfo "The following changes will be applied:"
@@ -259,9 +331,13 @@ function main {
     else
         logBlank "- Install package \"dnsmasq\""
     fi
-    #if [[ $response_samba -eq 1 ]]; then
-    #    logBlank "- Install package \"samba\" and \"samba-common-bin\""
-    #fi
+    if [[ $response_samba -eq 1 ]]; then
+        logBlank "- Install package \"samba\" and \"samba-common-bin\""
+        logBlank "- Setup file share"
+        if [[ $response_exfat -eq 1 ]]; then
+            logBlank "- Setup exFAT support for external storage"
+        fi
+    fi
 
     confirm "Do you want to proceed with the installation?"
     if [[ $? -eq 1 ]]; then
@@ -271,6 +347,7 @@ function main {
 
     # Run Installation routines
     logInfo "OK, let's go!"
+    updatePackageSources
 
     if [[ $response_pihole -eq 1 ]]; then
         installPiHole
@@ -284,7 +361,15 @@ function main {
 
     if [[ $response_ipforward -eq 1 ]]; then installIpForward; fi
 
-    #if [[ $response_samba -eq 1 ]]; then installSamba; fi
+    if [[ $response_samba -eq 1 ]]; then
+        installSamba
+        if [[ $response_exfat -eq 1 ]]; then
+            installExfat
+            configureFstab "exfat"
+        else
+            configureFstab "vfat"
+        fi
+    fi
 
     logInfo "Installation completed!"
     logWarn "A reboot is required to finish the installation!"
