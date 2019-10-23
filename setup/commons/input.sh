@@ -5,7 +5,7 @@ source "${_SCRIPT_LOCATION}/logging.sh"
 
 function confirm {
     question=${1}
-    question=$(log "[?]" "${question} ${COLOR_NONE}(Y/N) " "${COLOR_BLUE}")
+    question=$(log "[?]" "${question} ${COLOR_NONE}(Y/N) " "${COLOR_LBLUE}")
 
     while true; do
         read -n1 -p "${question}" yn
