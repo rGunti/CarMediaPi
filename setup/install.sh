@@ -271,15 +271,19 @@ function main {
 
     # Run Installation routines
     logInfo "OK, let's go!"
-    if [[ $response_hotspot -eq 1 ]]; then
-        installHotspot "${response_hotspot_name}" "${response_hotspot_psk}"
-    fi
-    if [[ $response_ipforward -eq 1 ]]; then installIpForward; fi
+
     if [[ $response_pihole -eq 1 ]]; then
         installPiHole
     else
         installDnsMasq
     fi
+
+    if [[ $response_hotspot -eq 1 ]]; then
+        installHotspot "${response_hotspot_name}" "${response_hotspot_psk}"
+    fi
+
+    if [[ $response_ipforward -eq 1 ]]; then installIpForward; fi
+
     #if [[ $response_samba -eq 1 ]]; then installSamba; fi
 
     logInfo "Installation completed!"
